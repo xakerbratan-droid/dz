@@ -1,0 +1,39 @@
+name: Setup Supabase Database
+
+on:
+  workflow_dispatch:
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create tables and policies
+        run: |
+          run_sql() {
+            curl -s -X POST \
+              "https://api.supabase.com/v1/projects/pcwqetnwnfczjsodzopb/database/query" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\": \"$1\"}"
+          }
+
+          echo "Creating entries table..."
+          run_sql "CREATE TABLE IF NOT EXISTS entries (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), date TEXT NOT NULL, subject TEXT NOT NULL, type TEXT NOT NULL, content TEXT NOT NULL, deadline TEXT, image_url TEXT, attachments JSONB, links TEXT[], created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW())"
+
+          echo "Creating schedule table..."
+          run_sql "CREATE TABLE IF NOT EXISTS schedule (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), day_of_week INTEGER NOT NULL, period INTEGER NOT NULL, subject TEXT NOT NULL, week_type TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())"
+
+          echo "Creating subjects table..."
+          run_sql "CREATE TABLE IF NOT EXISTS subjects (id UUID PRIMARY KEY DEFAULT gen_random_uuid(), name TEXT NOT NULL, emoji TEXT NOT NULL, color TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT NOW())"
+
+          echo "Enabling RLS..."
+          run_sql "ALTER TABLE entries ENABLE ROW LEVEL SECURITY"
+          run_sql "ALTER TABLE schedule ENABLE ROW LEVEL SECURITY"
+          run_sql "ALTER TABLE subjects ENABLE ROW LEVEL SECURITY"
+
+          echo "Creating policies..."
+          run_sql "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='entries' AND policyname='allow_all') THEN CREATE POLICY allow_all ON entries FOR ALL USING (true); END IF; END \$\$"
+          run_sql "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='schedule' AND policyname='allow_all') THEN CREATE POLICY allow_all ON schedule FOR ALL USING (true); END IF; END \$\$"
+          run_sql "DO \$\$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename='subjects' AND policyname='allow_all') THEN CREATE POLICY allow_all ON subjects FOR ALL USING (true); END IF; END \$\$"
+
+          echo "Done!"

@@ -1,0 +1,70 @@
+name: Fix Key and Deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Get correct Supabase anon key
+        id: getkey
+        run: |
+          KEYS=$(curl -s "https://api.supabase.com/v1/projects/pcwqetnwnfczjsodzopb/api-keys" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_TOKEN }}")
+          echo "Keys response: $KEYS"
+          ANON_KEY=$(echo $KEYS | python3 -c "
+          import sys, json
+          data = json.load(sys.stdin)
+          for k in data:
+              if k.get('name') == 'anon':
+                  print(k.get('api_key', ''))
+                  break
+          " 2>/dev/null || echo "")
+          echo "ANON_KEY=$ANON_KEY" >> $GITHUB_OUTPUT
+          echo "Found key: ${ANON_KEY:0:20}..."
+
+      - name: Update supabase.ts with correct key
+        run: |
+          KEY="${{ steps.getkey.outputs.ANON_KEY }}"
+          if [ -z "$KEY" ]; then
+            echo "Failed to get key!"
+            exit 1
+          fi
+          sed -i "s|const SUPABASE_ANON_KEY = '.*'|const SUPABASE_ANON_KEY = '$KEY'|" src/lib/supabase.ts
+          echo "Updated supabase.ts"
+          grep "SUPABASE_ANON_KEY" src/lib/supabase.ts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install and build
+        run: |
+          npm install
+          npm run build
+
+      - name: Deploy to gh-pages
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          cp dist/index.html /tmp/built.html
+          git fetch origin gh-pages
+          git checkout gh-pages
+          cp /tmp/built.html index.html
+          git add index.html
+          git diff --cached --stat
+          git commit -m "Deploy: fix Supabase key" || echo "Nothing to commit"
+          git push origin gh-pages
+
+      - name: Also commit key fix to main
+        run: |
+          git checkout main
+          git add src/lib/supabase.ts
+          git commit -m "Fix: correct Supabase anon key" || echo "Nothing to commit"
+          git push origin main

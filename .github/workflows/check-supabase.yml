@@ -1,0 +1,21 @@
+name: Check Supabase Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get project API keys
+        run: |
+          echo "=== Fetching project keys ==="
+          curl -s "https://api.supabase.com/v1/projects/pcwqetnwnfczjsodzopb/api-keys" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_TOKEN }}"
+
+      - name: Test connection with current key
+        run: |
+          echo "=== Testing current key ==="
+          curl -s "https://pcwqetnwnfczjsodzopb.supabase.co/rest/v1/entries?limit=1" \
+            -H "apikey: sb_publishable_-cWh8hoiSDtmZQxvliFvnw_a4jGIZ5f" \
+            -H "Authorization: Bearer sb_publishable_-cWh8hoiSDtmZQxvliFvnw_a4jGIZ5f"

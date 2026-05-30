@@ -1,0 +1,41 @@
+name: Fix RLS Policies
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fix policies
+        run: |
+          sql() {
+            curl -s -X POST \
+              "https://api.supabase.com/v1/projects/pcwqetnwnfczjsodzopb/database/query" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_TOKEN }}" \
+              -H "Content-Type: application/json" \
+              -d "{\"query\": \"$1\"}"
+          }
+
+          echo "Dropping old policies..."
+          sql "DROP POLICY IF EXISTS allow_all ON entries"
+          sql "DROP POLICY IF EXISTS allow_all ON schedule"
+          sql "DROP POLICY IF EXISTS allow_all ON subjects"
+
+          echo "Creating correct policies..."
+          sql "CREATE POLICY select_entries ON entries FOR SELECT TO anon USING (true)"
+          sql "CREATE POLICY insert_entries ON entries FOR INSERT TO anon WITH CHECK (true)"
+          sql "CREATE POLICY update_entries ON entries FOR UPDATE TO anon USING (true) WITH CHECK (true)"
+          sql "CREATE POLICY delete_entries ON entries FOR DELETE TO anon USING (true)"
+
+          sql "CREATE POLICY select_schedule ON schedule FOR SELECT TO anon USING (true)"
+          sql "CREATE POLICY insert_schedule ON schedule FOR INSERT TO anon WITH CHECK (true)"
+          sql "CREATE POLICY update_schedule ON schedule FOR UPDATE TO anon USING (true) WITH CHECK (true)"
+          sql "CREATE POLICY delete_schedule ON schedule FOR DELETE TO anon USING (true)"
+
+          sql "CREATE POLICY select_subjects ON subjects FOR SELECT TO anon USING (true)"
+          sql "CREATE POLICY insert_subjects ON subjects FOR INSERT TO anon WITH CHECK (true)"
+          sql "CREATE POLICY update_subjects ON subjects FOR UPDATE TO anon USING (true) WITH CHECK (true)"
+          sql "CREATE POLICY delete_subjects ON subjects FOR DELETE TO anon USING (true)"
+
+          echo "Done!"
