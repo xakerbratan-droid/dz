@@ -9,7 +9,6 @@ export function useEntries() {
   const [isLoaded, setIsLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Загрузка данных из Supabase при старте
   useEffect(() => {
     loadFromSupabase();
   }, []);
@@ -17,26 +16,40 @@ export function useEntries() {
   const loadFromSupabase = async () => {
     try {
       setError(null);
+      // Выбираем только нужные поля — без тяжёлых base64 данных
       const { data, error: fetchError } = await supabase
         .from(DB_TABLE)
-        .select('*')
+        .select('id, date, subject, type, content, deadline, image_url, attachments, links, created_at')
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
 
       if (data) {
-        const formatted: Entry[] = data.map(row => ({
-          id: row.id,
-          date: row.date,
-          subject: row.subject,
-          type: row.type,
-          content: row.content,
-          deadline: row.deadline || undefined,
-          imageUrl: row.image_url || undefined,
-          attachments: row.attachments || undefined,
-          links: row.links || undefined,
-          createdAt: new Date(row.created_at).getTime(),
-        }));
+        const formatted: Entry[] = data.map(row => {
+          // Очищаем вложения от base64 data если есть url (экономим память)
+          const attachments = row.attachments
+            ? row.attachments.map((att: any) => ({
+                url: att.url,
+                // Оставляем data только для legacy записей без url
+                data: att.url ? undefined : att.data,
+                type: att.type,
+                name: att.name,
+              }))
+            : undefined;
+
+          return {
+            id: row.id,
+            date: row.date,
+            subject: row.subject,
+            type: row.type,
+            content: row.content,
+            deadline: row.deadline || undefined,
+            imageUrl: row.image_url || undefined,
+            attachments,
+            links: row.links || undefined,
+            createdAt: new Date(row.created_at).getTime(),
+          };
+        });
         setEntries(formatted);
       }
     } catch (e) {
@@ -52,6 +65,16 @@ export function useEntries() {
     const createdAt = Date.now();
     const now = new Date(createdAt).toISOString();
 
+    // Сохраняем только url, не base64
+    const cleanAttachments = entry.attachments
+      ? entry.attachments.map(att => ({
+          url: att.url,
+          data: att.url ? undefined : att.data,
+          type: att.type,
+          name: att.name,
+        }))
+      : null;
+
     const dbRow = {
       id,
       date: entry.date,
@@ -60,7 +83,7 @@ export function useEntries() {
       content: entry.content,
       deadline: entry.deadline || null,
       image_url: entry.imageUrl || null,
-      attachments: entry.attachments || null,
+      attachments: cleanAttachments,
       links: entry.links || null,
       created_at: now,
       updated_at: now,
@@ -68,10 +91,7 @@ export function useEntries() {
 
     try {
       setError(null);
-      const { error: insertError } = await supabase
-        .from(DB_TABLE)
-        .insert(dbRow);
-
+      const { error: insertError } = await supabase.from(DB_TABLE).insert(dbRow);
       if (insertError) throw insertError;
 
       const newEntry: Entry = {
@@ -97,10 +117,7 @@ export function useEntries() {
 
   const updateEntry = useCallback(async (id: string, updates: Partial<Entry>) => {
     const now = new Date().toISOString();
-
-    const dbUpdates: Record<string, any> = {
-      updated_at: now,
-    };
+    const dbUpdates: Record<string, any> = { updated_at: now };
 
     if (updates.date !== undefined) dbUpdates.date = updates.date;
     if (updates.subject !== undefined) dbUpdates.subject = updates.subject;
@@ -108,18 +125,22 @@ export function useEntries() {
     if (updates.content !== undefined) dbUpdates.content = updates.content;
     if (updates.deadline !== undefined) dbUpdates.deadline = updates.deadline || null;
     if (updates.imageUrl !== undefined) dbUpdates.image_url = updates.imageUrl || null;
-    if (updates.attachments !== undefined) dbUpdates.attachments = updates.attachments || null;
     if (updates.links !== undefined) dbUpdates.links = updates.links || null;
+    if (updates.attachments !== undefined) {
+      dbUpdates.attachments = updates.attachments
+        ? updates.attachments.map(att => ({
+            url: att.url,
+            data: att.url ? undefined : att.data,
+            type: att.type,
+            name: att.name,
+          }))
+        : null;
+    }
 
     try {
       setError(null);
-      const { error: updateError } = await supabase
-        .from(DB_TABLE)
-        .update(dbUpdates)
-        .eq('id', id);
-
+      const { error: updateError } = await supabase.from(DB_TABLE).update(dbUpdates).eq('id', id);
       if (updateError) throw updateError;
-
       setEntries(prev => prev.map(e => e.id === id ? { ...e, ...updates } : e));
     } catch (e) {
       console.error('Ошибка обновления:', e);
@@ -131,13 +152,8 @@ export function useEntries() {
   const deleteEntry = useCallback(async (id: string) => {
     try {
       setError(null);
-      const { error: deleteError } = await supabase
-        .from(DB_TABLE)
-        .delete()
-        .eq('id', id);
-
+      const { error: deleteError } = await supabase.from(DB_TABLE).delete().eq('id', id);
       if (deleteError) throw deleteError;
-
       setEntries(prev => prev.filter(e => e.id !== id));
     } catch (e) {
       console.error('Ошибка удаления:', e);
@@ -149,15 +165,9 @@ export function useEntries() {
   const replaceAllEntries = useCallback(async (newEntries: Entry[]) => {
     try {
       setError(null);
-      // Удаляем все старые записи
-      const { error: deleteAllError } = await supabase
-        .from(DB_TABLE)
-        .delete()
-        .neq('id', '00000000-0000-0000-0000-000000000000');
-
+      const { error: deleteAllError } = await supabase.from(DB_TABLE).delete().neq('id', '00000000-0000-0000-0000-000000000000');
       if (deleteAllError) throw deleteAllError;
 
-      // Вставляем новые
       if (newEntries.length > 0) {
         const rows = newEntries.map(e => ({
           id: e.id || crypto.randomUUID(),
@@ -172,11 +182,7 @@ export function useEntries() {
           created_at: new Date(e.createdAt || Date.now()).toISOString(),
           updated_at: new Date().toISOString(),
         }));
-
-        const { error: insertError } = await supabase
-          .from(DB_TABLE)
-          .insert(rows);
-
+        const { error: insertError } = await supabase.from(DB_TABLE).insert(rows);
         if (insertError) throw insertError;
       }
 
@@ -188,20 +194,14 @@ export function useEntries() {
     }
   }, []);
 
-  // Объединение импортированных записей с существующими (добавляет только новые)
   const mergeEntries = useCallback(async (importedEntries: Entry[]) => {
     try {
       setError(null);
-
-      // Находим записи, которых ещё нет в БД (по id)
       const existingIds = new Set(entries.map(e => e.id));
       const newEntries = importedEntries.filter(e => !existingIds.has(e.id));
 
-      if (newEntries.length === 0) {
-        return { added: 0, skipped: importedEntries.length };
-      }
+      if (newEntries.length === 0) return { added: 0, skipped: importedEntries.length };
 
-      // Вставляем только новые записи
       const rows = newEntries.map(e => ({
         id: e.id || crypto.randomUUID(),
         date: e.date,
@@ -216,15 +216,10 @@ export function useEntries() {
         updated_at: new Date().toISOString(),
       }));
 
-      const { error: insertError } = await supabase
-        .from(DB_TABLE)
-        .insert(rows);
-
+      const { error: insertError } = await supabase.from(DB_TABLE).insert(rows);
       if (insertError) throw insertError;
 
-      // Обновляем локальное состояние
       setEntries(prev => [...newEntries, ...prev]);
-
       return { added: newEntries.length, skipped: importedEntries.length - newEntries.length };
     } catch (e) {
       console.error('Ошибка объединения записей:', e);
@@ -237,15 +232,5 @@ export function useEntries() {
     await loadFromSupabase();
   }, []);
 
-  return {
-    entries,
-    addEntry,
-    updateEntry,
-    deleteEntry,
-    replaceAllEntries,
-    mergeEntries,
-    refresh,
-    isLoaded,
-    error
-  };
+  return { entries, addEntry, updateEntry, deleteEntry, replaceAllEntries, mergeEntries, refresh, isLoaded, error };
 }
