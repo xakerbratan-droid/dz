@@ -3,21 +3,22 @@ export type EntryType = 'dz' | 'gdz' | 'srs';
 export type MediaType = 'image' | 'video';
 
 export interface Attachment {
-  data: string; // Data URL файла
+  data?: string;   // Data URL (только локально при загрузке, не хранится в БД)
+  url?: string;    // Supabase Storage public URL (хранится в БД)
   type: MediaType;
   name: string;
 }
 
 export interface Entry {
   id: string;
-  date: string; // YYYY-MM-DD format (дата создания/добавления)
+  date: string;
   subject: string;
   type: EntryType;
   content: string;
-  deadline?: string; // YYYY-MM-DD format (дата сдачи для СРС)
-  imageUrl?: string; // Оставлено для обратной совместимости
-  attachment?: Attachment; // Старое поле (одно вложение) — для обратной совместимости
-  attachments?: Attachment[]; // Новое поле — массив вложений
-  links?: string[]; // Внешние ссылки
+  deadline?: string;
+  imageUrl?: string;
+  attachment?: Attachment;
+  attachments?: Attachment[];
+  links?: string[];
   createdAt: number;
 }
