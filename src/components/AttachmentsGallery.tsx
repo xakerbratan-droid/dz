@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Entry } from '../types';
-import { getAttachments } from '../utils/attachments';
+import { getAttachments, getAttachmentDisplayUrl } from '../utils/attachments';
 import { MediaViewer } from './MediaViewer';
 import { Image, Film, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -17,7 +17,7 @@ export function AttachmentsGallery({ entry, alt = 'Вложение' }: Attachme
   const hasLegacyImage = entry.imageUrl && attachments.length === 0;
 
   const allMedia = hasLegacyImage
-    ? [{ data: entry.imageUrl!, type: 'image' as const, name: 'Изображение' }]
+    ? [{ url: entry.imageUrl!, type: 'image' as const, name: 'Изображение' }]
     : attachments;
 
   if (allMedia.length === 0) return null;
@@ -30,37 +30,23 @@ export function AttachmentsGallery({ entry, alt = 'Вложение' }: Attachme
   if (videoCount > 0) parts.push(`${videoCount} видео`);
   const label = parts.join(', ');
 
-  // Обработка кнопки "назад" на телефоне
   useEffect(() => {
     if (viewerIndex === null) return;
-
-    // Добавляем запись в историю браузера
     history.pushState({ mediaViewer: true }, '');
-
-    const handlePopState = () => {
-      setViewerIndex(null);
-    };
-
+    const handlePopState = () => setViewerIndex(null);
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [viewerIndex]);
 
-  const openViewer = (index: number) => {
-    setViewerIndex(index);
-  };
+  const openViewer = (index: number) => setViewerIndex(index);
 
   const closeViewer = () => {
-    // Если мы добавили запись в историю — делаем back, иначе просто закрываем
-    if (viewerIndex !== null) {
-      history.back();
-    } else {
-      setViewerIndex(null);
-    }
+    if (viewerIndex !== null) history.back();
+    else setViewerIndex(null);
   };
 
   return (
     <>
-      {/* Свёрнутая кнопка */}
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); setIsExpanded(!isExpanded); }}
@@ -71,16 +57,12 @@ export function AttachmentsGallery({ entry, alt = 'Вложение' }: Attachme
         }`}
       >
         <span className="flex items-center gap-2">
-          {videoCount > 0 && imageCount === 0
-            ? <Film size={16} />
-            : <Image size={16} />
-          }
+          {videoCount > 0 && imageCount === 0 ? <Film size={16} /> : <Image size={16} />}
           {label}
         </span>
         {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
       </button>
 
-      {/* Раскрытая галерея */}
       {isExpanded && (
         <div className="mt-2">
           {allMedia.length === 1 ? (
@@ -89,32 +71,44 @@ export function AttachmentsGallery({ entry, alt = 'Вложение' }: Attachme
               onClick={(e) => { e.stopPropagation(); openViewer(0); }}
             >
               {allMedia[0].type === 'video' ? (
-                <video src={allMedia[0].data} className="w-full h-auto max-h-96 object-contain pointer-events-none" />
+                <video src={getAttachmentDisplayUrl(allMedia[0])} className="w-full h-auto max-h-96 object-contain pointer-events-none" />
               ) : (
-                <img src={allMedia[0].data} alt={alt} className="w-full h-auto object-contain max-h-96" />
+                <img
+                  src={getAttachmentDisplayUrl(allMedia[0])}
+                  alt={alt}
+                  className="w-full h-auto object-contain max-h-96"
+                  loading="lazy"
+                />
               )}
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-2">
-              {allMedia.map((att, idx) => (
-                <div
-                  key={idx}
-                  className="rounded-lg overflow-hidden border border-gray-100 bg-black/5 flex justify-center aspect-square cursor-pointer"
-                  onClick={(e) => { e.stopPropagation(); openViewer(idx); }}
-                >
-                  {att.type === 'video' ? (
-                    <video src={att.data} className="w-full h-full object-cover pointer-events-none" />
-                  ) : (
-                    <img src={att.data} alt={`${alt} ${idx + 1}`} className="w-full h-full object-cover" />
-                  )}
-                </div>
-              ))}
+              {allMedia.map((att, idx) => {
+                const displayUrl = getAttachmentDisplayUrl(att);
+                return (
+                  <div
+                    key={idx}
+                    className="rounded-lg overflow-hidden border border-gray-100 bg-black/5 flex justify-center aspect-square cursor-pointer"
+                    onClick={(e) => { e.stopPropagation(); openViewer(idx); }}
+                  >
+                    {att.type === 'video' ? (
+                      <video src={displayUrl} className="w-full h-full object-cover pointer-events-none" />
+                    ) : (
+                      <img
+                        src={displayUrl}
+                        alt={`${alt} ${idx + 1}`}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
       )}
 
-      {/* Полноэкранный просмотр */}
       {viewerIndex !== null && (
         <MediaViewer media={allMedia} startIndex={viewerIndex} onClose={closeViewer} />
       )}
