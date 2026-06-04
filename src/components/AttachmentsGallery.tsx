@@ -115,3 +115,4 @@ export function AttachmentsGallery({ entry, alt = 'Вложение' }: Attachme
     </>
   );
 }
+
