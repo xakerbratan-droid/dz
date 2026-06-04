@@ -270,3 +270,4 @@ export function EntryForm({ initialDate, initialType, initialSubject, initialCon
     </div>
   );
 }
+
