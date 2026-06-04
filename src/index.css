@@ -1,7 +1,7 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 @import "katex/dist/katex.min.css";
-
-@custom-variant dark (&:where(.dark, .dark *));
 
 /* === Серо-чёрная тёмная тема === */
 :root {
