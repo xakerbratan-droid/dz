@@ -151,7 +151,7 @@ export function EntryForm({ initialDate, initialType, initialSubject, initialCon
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Вложения (Фото / Видео)
+              Вложения (Фото / Видео / Документы)
               {attachments.length > 0 && (
                 <span className="ml-2 text-xs text-gray-500 font-normal">— {attachments.length} шт.</span>
               )}
@@ -166,14 +166,18 @@ export function EntryForm({ initialDate, initialType, initialSubject, initialCon
                       <div className="flex items-center gap-3 overflow-hidden">
                         {att.type === 'image' && displayUrl ? (
                           <img src={displayUrl} alt={att.name} className="w-10 h-10 object-cover rounded-lg flex-shrink-0" />
+                        ) : att.type === 'video' ? (
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center flex-shrink-0">
+                            <FileIcon size={20} />
+                          </div>
                         ) : (
-                          <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
+                          <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center flex-shrink-0">
                             <FileIcon size={20} />
                           </div>
                         )}
                         <div className="truncate min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">{att.name}</p>
-                          <p className="text-xs text-gray-500">{att.type === 'video' ? 'Видео' : 'Изображение'}</p>
+                          <p className="text-xs text-gray-500">{att.type === 'video' ? 'Видео' : att.type === 'document' ? 'Документ' : 'Изображение'}</p>
                         </div>
                       </div>
                       <button type="button" onClick={() => removeAttachment(index)} className="p-1.5 hover:bg-red-100 text-red-500 rounded-md transition-colors flex-shrink-0 ml-2" title="Удалить">
@@ -204,12 +208,12 @@ export function EntryForm({ initialDate, initialType, initialSubject, initialCon
                       {attachments.length === 0 ? 'Нажмите, чтобы загрузить файлы' : 'Добавить ещё файл'}
                     </span>
                   </div>
-                  <span className="text-xs text-gray-500 mt-0.5">PNG, JPG, MP4 — можно несколько сразу</span>
+                  <span className="text-xs text-gray-500 mt-0.5">Фото, видео, PDF, DOC, PPTX и другие</span>
                 </>
               )}
             </div>
 
-            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*" multiple className="hidden" />
+            <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt" multiple className="hidden" />
           </div>
 
           {/* Внешние ссылки */}
