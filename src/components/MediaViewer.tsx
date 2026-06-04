@@ -71,3 +71,4 @@ export function MediaViewer({ media, startIndex, onClose }: MediaViewerProps) {
     </div>
   );
 }
+
